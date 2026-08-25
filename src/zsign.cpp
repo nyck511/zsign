@@ -31,6 +31,7 @@ const struct option options[] = {
 	{"pkey", required_argument, NULL, 'k'},
 	{"prov", required_argument, NULL, 'm'},
 	{"password", required_argument, NULL, 'p'},
+	{"password-stdin", no_argument, NULL, 1000},
 	{"bundle_id", required_argument, NULL, 'b'},
 	{"bundle_name", required_argument, NULL, 'n'},
 	{"bundle_version", required_argument, NULL, 'r'},
@@ -130,6 +131,7 @@ int usage()
 	ZLog::Print("-f, --force\t\tForce sign without cache when signing folder.\n");
 	ZLog::Print("-o, --output\t\tPath to output ipa file.\n");
 	ZLog::Print("-p, --password\t\tPassword for private key or p12 file.\n");
+	ZLog::Print("    --password-stdin\tRead the password from one line on standard input.\n");
 	ZLog::Print("-b, --bundle_id\t\tNew bundle id to change.\n");
 	ZLog::Print("-n, --bundle_name\tNew bundle name to change.\n");
 	ZLog::Print("-r, --bundle_version\tNew bundle version to change.\n");
@@ -177,6 +179,7 @@ int main(int argc, char* argv[])
 	bool bRemoveWatchApp = false;
 	bool bRemoveUISupportedDevices = false;
 	bool bInjectExtensions = false;
+	bool bPasswordStdin = false;
 	uint32_t uZipLevel = 0;
 
 	string strCertFile;
@@ -221,6 +224,9 @@ int main(int argc, char* argv[])
 			break;
 		case 'p':
 			strPassword = optarg;
+			break;
+		case 1000:
+			bPasswordStdin = true;
 			break;
 		case 'b':
 			strBundleId = optarg;
@@ -306,7 +312,25 @@ int main(int argc, char* argv[])
 			break;
 		}
 
-		ZLog::DebugV(">>> Option:\t-%c, %s\n", opt, optarg ? optarg : "");
+		if (opt == 'p') {
+			ZLog::DebugV(">>> Option:\t-p, [redacted]\n");
+		} else {
+			ZLog::DebugV(">>> Option:\t-%c, %s\n", opt, optarg ? optarg : "");
+		}
+	}
+
+	if (bPasswordStdin) {
+		if (!strPassword.empty()) {
+			ZLog::Error(">>> --password and --password-stdin are mutually exclusive.\n");
+			return -1;
+		}
+		if (!std::getline(std::cin, strPassword)) {
+			ZLog::Error(">>> Unable to read the password from standard input.\n");
+			return -1;
+		}
+		if (!strPassword.empty() && strPassword.back() == '\r') {
+			strPassword.pop_back();
+		}
 	}
 
 	if (optind >= argc) {
